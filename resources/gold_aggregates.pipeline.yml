@@ -1,0 +1,16 @@
+resources:
+  pipelines:
+    gold_aggregates:
+      name: dabs-demo-gold-${bundle.target}
+      catalog: ${var.catalog}
+      schema: ${resources.schemas.gold.name}
+      serverless: true
+      continuous: false
+      channel: current
+      root_path: ../src/pipelines/gold
+      libraries:
+        - glob:
+            include: ../src/pipelines/gold/transformations/**
+      configuration:
+        source_catalog: ${var.catalog}
+        silver_schema: ${resources.schemas.silver.name}

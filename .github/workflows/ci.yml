@@ -1,0 +1,50 @@
+# Pull request: validate every target, then deploy and run the bundle in dev.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: validate (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [dev, qa, staging, prod]
+    # The dev identity validates every target; it reads and never deploys.
+    # Only dev is --strict here: other targets' folder permissions name their own SP,
+    # which is checked strictly when that stage deploys (deploy.yml).
+    environment: dev
+    env:
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: databricks/setup-cli@main
+        with:
+          version: 1.17.0
+      - run: databricks bundle validate ${{ matrix.target == 'dev' && '--strict' || '' }} -t ${{ matrix.target }}
+
+  deploy-dev:
+    name: deploy + run (dev)
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: databricks/setup-cli@main
+        with:
+          version: 1.17.0
+      - run: databricks bundle deploy -t dev
+      - run: databricks bundle run governed_etl -t dev

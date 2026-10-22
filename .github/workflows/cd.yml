@@ -1,0 +1,34 @@
+# Merge to main: promote the same commit qa -> staging -> prod.
+# Each stage authenticates as its own environment service principal.
+# The `prod` GitHub environment requires a reviewer before the deploy starts.
+name: cd
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cd
+  cancel-in-progress: false
+
+jobs:
+  qa:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: qa
+    secrets: inherit
+
+  staging:
+    needs: qa
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: staging
+    secrets: inherit
+
+  prod:
+    needs: staging
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: prod
+    secrets: inherit

@@ -1,0 +1,32 @@
+# Schemas and their Unity Catalog grants, defined as code.
+resources:
+  schemas:
+    bronze:
+      catalog_name: ${var.catalog}
+      name: bronze
+      comment: Raw landing zone. Readable only by the environment service principal.
+
+    silver:
+      catalog_name: ${var.catalog}
+      name: silver
+      comment: Curated customer and transaction data. PII/PCI is masked by column masks and ABAC policies.
+      grants:
+        - principal: account users
+          privileges:
+            - USE_SCHEMA
+            - SELECT
+
+    gold:
+      catalog_name: ${var.catalog}
+      name: gold
+      comment: Aggregates for BI. No PII.
+      grants:
+        - principal: account users
+          privileges:
+            - USE_SCHEMA
+            - SELECT
+
+    governance:
+      catalog_name: ${var.catalog}
+      name: governance
+      comment: Mask and row filter functions plus the entitlements table that drives them.

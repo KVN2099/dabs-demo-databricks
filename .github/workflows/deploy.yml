@@ -1,0 +1,27 @@
+# Reusable: validate, deploy and run the bundle for one target.
+name: deploy
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    name: deploy + run (${{ inputs.target }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
+    env:
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: databricks/setup-cli@main
+        with:
+          version: 1.17.0
+      - run: databricks bundle validate --strict -t ${{ inputs.target }}
+      - run: databricks bundle deploy -t ${{ inputs.target }}
+      - run: databricks bundle run governed_etl -t ${{ inputs.target }}

@@ -1,0 +1,90 @@
+# Databricks Asset Bundle: governed ETL promoted dev -> qa -> staging -> prod.
+#
+# Topology (created once by infra/bootstrap_environments.py):
+#   catalog dabs_demo_<env>  -> ISOLATED, bound to the env workspace, owned by the env SP
+#   SP      dabs-demo-<env>-sp -> deploys and runs everything in that env
+#
+# Everything below (schemas, grants, jobs, pipelines, permissions, masks, policies)
+# is code and is deployed by CI.
+
+bundle:
+  name: dabs_demo
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Unity Catalog catalog for this environment.
+  env_sp_name:
+    description: Display name of the environment service principal.
+  env_sp:
+    description: Application ID of the environment service principal (resolved by name).
+    lookup:
+      service_principal: ${var.env_sp_name}
+  analyst:
+    description: Demo human principal used to show masking and row filtering.
+    default: kevin.romero@databricks.com
+  analyst_regions:
+    description: Regions the analyst can see (comma separated, or ALL).
+    default: NA
+  pii_readers:
+    description: Principals exempt from PII/PCI masks (comma separated). Empty in lower envs.
+    default: ""
+  customer_count:
+    description: Number of synthetic customers to generate.
+    default: "5000"
+
+workspace:
+  host: https://fe-sandbox-kevo.cloud.databricks.com
+
+# Everything runs as the environment service principal, never as a human.
+run_as:
+  service_principal_name: ${var.env_sp}
+
+# Workspace-object permissions for every job and pipeline in the bundle.
+permissions:
+  - level: CAN_MANAGE
+    service_principal_name: ${var.env_sp}
+  - level: CAN_MANAGE
+    group_name: admins
+  - level: CAN_VIEW
+    group_name: users
+
+targets:
+  dev:
+    default: true
+    mode: development
+    variables:
+      catalog: dabs_demo_dev
+      env_sp_name: dabs-demo-dev-sp
+
+  qa:
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog: dabs_demo_qa
+      env_sp_name: dabs-demo-qa-sp
+      customer_count: "20000"
+
+  staging:
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog: dabs_demo_staging
+      env_sp_name: dabs-demo-staging-sp
+      customer_count: "50000"
+
+  prod:
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog: dabs_demo_prod
+      env_sp_name: dabs-demo-prod-sp
+      customer_count: "100000"
+      analyst_regions: ALL
+      # Only prod has an approved PII reader. Lower environments mask for everyone.
+      pii_readers: ${var.analyst}

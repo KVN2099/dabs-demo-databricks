@@ -1,0 +1,51 @@
+resources:
+  jobs:
+    governed_etl:
+      name: dabs-demo-governed-etl-${bundle.target}
+      description: Apply governance, land synthetic customers and transactions, build gold aggregates.
+
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: bronze_schema
+          default: ${resources.schemas.bronze.name}
+        - name: silver_schema
+          default: ${resources.schemas.silver.name}
+        - name: governance_schema
+          default: ${resources.schemas.governance.name}
+        - name: env_sp
+          default: ${var.env_sp}
+        - name: analyst
+          default: ${var.analyst}
+        - name: analyst_regions
+          default: ${var.analyst_regions}
+        - name: pii_readers
+          default: ${var.pii_readers}
+        - name: customer_count
+          default: ${var.customer_count}
+
+      tasks:
+        # Tables are born governed: functions, tags, masks and policies exist before data lands.
+        - task_key: apply_governance
+          notebook_task:
+            notebook_path: ../src/governance/apply_governance.py
+
+        - task_key: ingest
+          depends_on:
+            - task_key: apply_governance
+          notebook_task:
+            notebook_path: ../src/ingest/generate_synthetic_data.py
+
+        - task_key: build_gold
+          depends_on:
+            - task_key: ingest
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.gold_aggregates.id}
+            full_refresh: true
+
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"
+        timezone_id: UTC
+        pause_status: PAUSED
+
+      max_concurrent_runs: 1
