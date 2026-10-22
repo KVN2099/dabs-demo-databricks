@@ -108,7 +108,7 @@ entitlement variables change per target.
 |---|---|---|
 | Row filter `region_filter` | `silver.customers`, `silver.transactions` | caller sees only regions in `governance.entitlements` |
 | Column mask `mask_email` | `silver.customers.email` | `a***@example.com` unless `pii_clear` |
-| Governed tags | `class.us_ssn`, `class.phone_number`, `class.credit_card`, `class.email_address`, `class.name`, `class.date_of_birth` | classification travels with the column |
+| Governed tags | `class.us_ssn`, `class.phone_number`, `class.credit_card` | classification travels with the column |
 | ABAC `pii_mask_ssn`, `pii_mask_phone` | `silver` schema | any column tagged SSN/phone shows last 4 |
 | ABAC `pci_mask_card_number` | `silver` schema | any column tagged credit card shows `**** **** **** 1234` |
 
@@ -142,4 +142,6 @@ Notes:
   automatically. Custom governed tags (for example `sensitivity = pii | pci`) work the same way.
 - Entitlements are a mapping table to keep the demo self-contained. In production, use account
   groups with `is_account_group_member()` and list groups in the ABAC `EXCEPT` clause.
+- Applying a governed tag requires `roles/tagPolicy.assigner` on that tag (Account console >
+  Governed tags > Permissions). The four env SPs hold it on the three tags above.
 - Bronze has no grants for humans. Only the environment SP (catalog owner) reads raw data.
