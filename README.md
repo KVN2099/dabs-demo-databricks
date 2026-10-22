@@ -89,7 +89,10 @@ Live demo: open a PR that changes `customer_count` or adds a gold MV, watch `ci`
 
 Local inner loop: `databricks bundle deploy -t dev --profile fe-sandbox-kevo`. Development mode
 prefixes every resource with your name (`[dev kevin_romero]`, `dev_kevin_romero_silver`), so
-developers do not collide with each other or with CI.
+developers do not collide with each other or with CI. Because jobs and pipelines `run_as` the dev
+SP, a developer needs the `Service Principal: User` role on `dabs-demo-dev-sp`
+(Settings > Identity and access > Service principals > dabs-demo-dev-sp > Permissions).
+Grant it to a developers group, not to individuals.
 
 ## 3. Lower-environment data strategy
 
