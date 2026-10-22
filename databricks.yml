@@ -36,7 +36,7 @@ variables:
     default: "5000"
 
 workspace:
-  host: https://fe-sandbox-kevo.cloud.databricks.com
+  host: https://dbc-0841a902-8c63.cloud.databricks.com
 
 # Everything runs as the environment service principal, never as a human.
 run_as:

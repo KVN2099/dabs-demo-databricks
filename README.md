@@ -33,20 +33,24 @@ One Unity Catalog metastore. One catalog and one service principal per environme
 | dev | `dabs_demo_dev` | `dabs-demo-dev-sp` | ISOLATED, bound to the dev workspace | browse, read masked silver/gold |
 | qa | `dabs_demo_qa` | `dabs-demo-qa-sp` | ISOLATED, bound to the qa workspace | browse, read masked silver/gold |
 | staging | `dabs_demo_staging` | `dabs-demo-staging-sp` | ISOLATED, bound to the staging workspace | browse, read masked silver/gold |
-| prod | `dabs_demo_prod` | `dabs-demo-prod-sp` | ISOLATED, bound to the prod workspace | read gold; approved readers see PII |
+| prod | `dabs_demo_prod` | `dabs-demo-prod-sp` | ISOLATED, bound to the prod workspace | browse, read silver/gold; approved readers see clear PII |
 
-- Each catalog has its own managed storage root, so environments never share storage.
+- Each catalog gets its own managed storage (a per-env path with `--storage-root`, or Databricks Default Storage).
 - Each catalog is owned by its environment SP. No human owns an environment.
 - `ISOLATED` plus workspace bindings means a catalog is only visible in the workspaces it is
   bound to. This sandbox has one workspace, so all four bind to it. In a real deployment pass
   `--workspace-ids '{"dev":[111],"qa":[222],"staging":[333],"prod":[444]}'`. A prod catalog can
   also be bound read-only into a lower workspace for validation.
+- The workspace must accept calls from GitHub-hosted runners. With IP access lists, use runners
+  with static egress IPs or context-based ingress rules keyed on the CI service principals.
 - The split is deliberate. `infra/` is platform-owned (normally Terraform) and runs once with
   admin rights. Everything inside a catalog is application-owned and deployed by the bundle.
 
 ```bash
-uv run infra/bootstrap_environments.py --profile fe-sandbox-kevo \
-  --storage-root s3://kevo-ext-s3-332745928618-hlfn1o/dabs_demo
+# Default Storage workspace: catalogs are created through a SQL warehouse
+uv run infra/bootstrap_environments.py --profile kevo-dabs --warehouse-id b5b0ec4f132f86ee
+# Workspace with your own storage: one managed location per env
+uv run infra/bootstrap_environments.py --profile <profile> --storage-root s3://<bucket>/dabs_demo
 ```
 
 Show: Catalog Explorer > `dabs_demo_prod` > Workspaces tab (binding), Permissions tab (SP owner).
@@ -82,14 +86,17 @@ Pipeline:
 3. **Prod gate**: the `prod` GitHub environment requires a reviewer and only accepts `main`.
 
 ```bash
-infra/configure_github.sh fe-sandbox-kevo KVN2099/dabs-demo-databricks
+infra/configure_github.sh kevo-dabs KVN2099/dabs-demo-databricks
 ```
 
 Live demo: open a PR that changes `customer_count` or adds a gold MV, watch `ci`, merge, approve prod.
 
-Local inner loop: `databricks bundle deploy -t dev --profile fe-sandbox-kevo`. Development mode
+Local inner loop: `databricks bundle deploy -t dev --profile kevo-dabs`. Development mode
 prefixes every resource with your name (`[dev kevin_romero]`, `dev_kevin_romero_silver`), so
-developers do not collide with each other or with CI.
+developers do not collide with each other or with CI. Because jobs and pipelines `run_as` the dev
+SP, a developer needs the `Service Principal: User` role on `dabs-demo-dev-sp`
+(Settings > Identity and access > Service principals > dabs-demo-dev-sp > Permissions).
+Grant it to a developers group, not to individuals.
 
 ## 3. Lower-environment data strategy
 
@@ -101,7 +108,7 @@ entitlement variables change per target.
 |---|---|---|
 | Row filter `region_filter` | `silver.customers`, `silver.transactions` | caller sees only regions in `governance.entitlements` |
 | Column mask `mask_email` | `silver.customers.email` | `a***@example.com` unless `pii_clear` |
-| Governed tags | `class.us_ssn`, `class.phone_number`, `class.credit_card`, `class.email_address`, `class.name`, `class.date_of_birth` | classification travels with the column |
+| Governed tags | `class.us_ssn`, `class.phone_number`, `class.credit_card` | classification travels with the column |
 | ABAC `pii_mask_ssn`, `pii_mask_phone` | `silver` schema | any column tagged SSN/phone shows last 4 |
 | ABAC `pci_mask_card_number` | `silver` schema | any column tagged credit card shows `**** **** **** 1234` |
 
@@ -135,4 +142,6 @@ Notes:
   automatically. Custom governed tags (for example `sensitivity = pii | pci`) work the same way.
 - Entitlements are a mapping table to keep the demo self-contained. In production, use account
   groups with `is_account_group_member()` and list groups in the ABAC `EXCEPT` clause.
+- Applying a governed tag requires `roles/tagPolicy.assigner` on that tag (Account console >
+  Governed tags > Permissions). The four env SPs hold it on the three tags above.
 - Bronze has no grants for humans. Only the environment SP (catalog owner) reads raw data.

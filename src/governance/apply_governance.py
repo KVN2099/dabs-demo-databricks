@@ -31,6 +31,15 @@ def run(statement: str) -> None:
 
 # COMMAND ----------
 
+# MAGIC %md ## 0. Catalog access
+# MAGIC Humans can browse every environment. Schema grants in the bundle decide what they read.
+
+# COMMAND ----------
+
+run(f"GRANT USE CATALOG, BROWSE ON CATALOG `{catalog}` TO `account users`")
+
+# COMMAND ----------
+
 # MAGIC %md ## 1. Entitlements table
 
 # COMMAND ----------
@@ -140,13 +149,12 @@ CREATE TABLE IF NOT EXISTS {silver}.transactions (
 COMMENT 'Curated card transactions. PCI protected by ABAC.'
 """)
 
+# Only tags that drive ABAC policies. Applying a governed tag needs the
+# tagPolicy.assigner role on that tag for the env service principal.
 column_tags = {
     "customers": {
-        "full_name": "class.name",
-        "email": "class.email_address",
         "phone": "class.phone_number",
         "ssn": "class.us_ssn",
-        "date_of_birth": "class.date_of_birth",
     },
     "transactions": {
         "card_number": "class.credit_card",
