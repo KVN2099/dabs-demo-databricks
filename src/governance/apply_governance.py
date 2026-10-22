@@ -31,6 +31,15 @@ def run(statement: str) -> None:
 
 # COMMAND ----------
 
+# MAGIC %md ## 0. Catalog access
+# MAGIC Humans can browse every environment. Schema grants in the bundle decide what they read.
+
+# COMMAND ----------
+
+run(f"GRANT USE CATALOG, BROWSE ON CATALOG `{catalog}` TO `account users`")
+
+# COMMAND ----------
+
 # MAGIC %md ## 1. Entitlements table
 
 # COMMAND ----------

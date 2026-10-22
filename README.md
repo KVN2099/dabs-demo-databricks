@@ -33,7 +33,7 @@ One Unity Catalog metastore. One catalog and one service principal per environme
 | dev | `dabs_demo_dev` | `dabs-demo-dev-sp` | ISOLATED, bound to the dev workspace | browse, read masked silver/gold |
 | qa | `dabs_demo_qa` | `dabs-demo-qa-sp` | ISOLATED, bound to the qa workspace | browse, read masked silver/gold |
 | staging | `dabs_demo_staging` | `dabs-demo-staging-sp` | ISOLATED, bound to the staging workspace | browse, read masked silver/gold |
-| prod | `dabs_demo_prod` | `dabs-demo-prod-sp` | ISOLATED, bound to the prod workspace | read gold; approved readers see PII |
+| prod | `dabs_demo_prod` | `dabs-demo-prod-sp` | ISOLATED, bound to the prod workspace | browse, read silver/gold; approved readers see clear PII |
 
 - Each catalog gets its own managed storage (a per-env path with `--storage-root`, or Databricks Default Storage).
 - Each catalog is owned by its environment SP. No human owns an environment.

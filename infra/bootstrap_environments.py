@@ -14,7 +14,7 @@ For each environment it:
      Default Storage when --warehouse-id is given instead of --storage-root.
   3. Sets the catalog to ISOLATED and binds it to the workspace(s) for that env.
   4. Makes the env service principal the catalog owner (no human owns an env).
-  5. Grants humans (`account users`) browse access on lower environments, plus
+  5. Grants humans (`account users`) USE CATALOG + BROWSE in every env, plus
      CREATE SCHEMA in dev for personal development-mode deploys.
 
 Usage:
@@ -30,7 +30,6 @@ from databricks.sdk.errors import BadRequest
 from databricks.sdk.service import catalog, iam
 
 ENVIRONMENTS = ["dev", "qa", "staging", "prod"]
-LOWER_ENVIRONMENTS = {"dev", "qa", "staging"}
 
 
 def ensure_service_principal(w: WorkspaceClient, env: str) -> iam.ServicePrincipal:
@@ -110,14 +109,12 @@ def main() -> None:
                 add=[catalog.Privilege.ALL_PRIVILEGES, catalog.Privilege.MANAGE],
             )
         ]
-        if env in LOWER_ENVIRONMENTS:
-            human_privileges = [catalog.Privilege.USE_CATALOG, catalog.Privilege.BROWSE]
-            if env == "dev":
-                # Developers deploy their own prefixed copy of the bundle into dev.
-                human_privileges.append(catalog.Privilege.CREATE_SCHEMA)
-            changes.append(
-                catalog.PermissionsChange(principal="account users", add=human_privileges)
-            )
+        # Humans can browse every env; schema grants in the bundle decide what they read.
+        human_privileges = [catalog.Privilege.USE_CATALOG, catalog.Privilege.BROWSE]
+        if env == "dev":
+            # Developers deploy their own prefixed copy of the bundle into dev.
+            human_privileges.append(catalog.Privilege.CREATE_SCHEMA)
+        changes.append(catalog.PermissionsChange(principal="account users", add=human_privileges))
         w.grants.update(securable_type="catalog", full_name=cat_name, changes=changes)
         w.catalogs.update(cat_name, owner=sp.application_id)
 
