@@ -10,15 +10,16 @@ grants, masks, policies) is owned by the bundle and deployed by CI.
 
 For each environment it:
   1. Creates a service principal `dabs-demo-<env>-sp` (the CI deploy + run identity).
-  2. Creates catalog `dabs_demo_<env>` with its own managed storage root.
+  2. Creates catalog `dabs_demo_<env>` with its own managed storage root, or on
+     Default Storage when --warehouse-id is given instead of --storage-root.
   3. Sets the catalog to ISOLATED and binds it to the workspace(s) for that env.
   4. Makes the env service principal the catalog owner (no human owns an env).
   5. Grants humans (`account users`) browse access on lower environments, plus
      CREATE SCHEMA in dev for personal development-mode deploys.
 
 Usage:
-  uv run infra/bootstrap_environments.py --profile fe-sandbox-kevo \
-      --storage-root s3://my-bucket/dabs_demo
+  uv run infra/bootstrap_environments.py --profile kevo-dabs --warehouse-id <id>
+  uv run infra/bootstrap_environments.py --profile <profile> --storage-root s3://my-bucket/dabs_demo
 """
 
 import argparse
@@ -44,8 +45,16 @@ def ensure_service_principal(w: WorkspaceClient, env: str) -> iam.ServicePrincip
     )
 
 
-def ensure_catalog(w: WorkspaceClient, env: str, storage_root: str) -> str:
+def ensure_catalog(w: WorkspaceClient, env: str, storage_root: str | None, warehouse_id: str | None) -> str:
     name = f"dabs_demo_{env}"
+    if not storage_root:
+        # Default Storage accounts: the catalogs API requires a location, SQL does not.
+        w.statement_execution.execute_statement(
+            warehouse_id=warehouse_id,
+            statement=f"CREATE CATALOG IF NOT EXISTS {name} COMMENT 'DABs demo: {env} environment catalog'",
+            wait_timeout="50s",
+        )
+        return name
     # get() is denied for an ISOLATED catalog not yet bound here, so key off create.
     try:
         w.catalogs.create(
@@ -63,7 +72,9 @@ def ensure_catalog(w: WorkspaceClient, env: str, storage_root: str) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--profile", required=True)
-    parser.add_argument("--storage-root", required=True, help="Base path for per-env managed storage")
+    storage = parser.add_mutually_exclusive_group(required=True)
+    storage.add_argument("--storage-root", help="Base path for per-env managed storage")
+    storage.add_argument("--warehouse-id", help="SQL warehouse used to create catalogs on Default Storage")
     parser.add_argument(
         "--workspace-ids",
         default="",
@@ -78,7 +89,7 @@ def main() -> None:
     summary = {}
     for env in ENVIRONMENTS:
         sp = ensure_service_principal(w, env)
-        cat_name = ensure_catalog(w, env, args.storage_root)
+        cat_name = ensure_catalog(w, env, args.storage_root, args.warehouse_id)
 
         w.workspace_bindings.update_bindings(
             securable_type="catalog",
